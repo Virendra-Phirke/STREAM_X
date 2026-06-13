@@ -1,0 +1,6 @@
+{
+  "name": "StreamX Player",
+  "description": "StreamX Player is a fully offline Android media player designed to deliver a powerful, lightweight, and feature-rich multimedia experience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
