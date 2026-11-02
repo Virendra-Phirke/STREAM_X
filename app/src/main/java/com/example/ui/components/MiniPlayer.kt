@@ -1,40 +1,35 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.viewmodel.AudioPlayerViewModel
 import com.example.ui.viewmodels.MediaViewModel
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.AsyncImagePainter
-import coil.compose.SubcomposeAsyncImageContent
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectDragGestures
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(
     playerViewModel: AudioPlayerViewModel,
@@ -44,152 +39,177 @@ fun MiniPlayer(
     val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
     val mediaIndex by playerViewModel.currentMediaItemIndex.collectAsStateWithLifecycle()
     val audios by mediaViewModel.audios.collectAsStateWithLifecycle()
-    val currentQueue by playerViewModel.currentQueue.collectAsStateWithLifecycle()
     val currentPosition by playerViewModel.currentPosition.collectAsStateWithLifecycle()
     val duration by playerViewModel.duration.collectAsStateWithLifecycle()
-    
-    // Only show if mediaController is loaded and has duration (is valid)
-    if (playerViewModel.mediaController != null && audios.isNotEmpty() && mediaIndex in audios.indices && currentQueue.isNotEmpty()) {
-        val currentAudio = audios[mediaIndex]
-        val context = LocalContext.current
-        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xE61A1A1A))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                .pointerInput(Unit) {
-                    var actionTriggered = false
-                    detectDragGestures(
-                        onDragStart = { actionTriggered = false },
-                        onDragEnd = { actionTriggered = false },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            if (actionTriggered) return@detectDragGestures
-                            
-                            val x = dragAmount.x
-                            val y = dragAmount.y
-                            if (kotlin.math.abs(x) > kotlin.math.abs(y)) {
-                                if (x > 30) {
-                                    playerViewModel.skipToPrevious()
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    actionTriggered = true
-                                } else if (x < -30) {
-                                    playerViewModel.skipToNext()
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    actionTriggered = true
-                                }
-                            } else {
-                                if (y < -30) {
-                                    onNavigateToPlayer(currentAudio.path)
-                                    actionTriggered = true
-                                }
-                            }
+
+    val currentAudio = if (audios.isNotEmpty() && mediaIndex in audios.indices) audios[mediaIndex] else null
+    val mediaController = playerViewModel.mediaController
+
+    // Only display MiniPlayer if media is actively playing or loaded in controller
+    val hasActiveMedia = mediaController != null && 
+            (isPlaying || (currentAudio != null && mediaController.mediaItemCount > 0))
+
+    if (!hasActiveMedia || currentAudio == null) {
+        return
+    }
+
+    val title = currentAudio.title
+    val artist = currentAudio.artist.takeIf { it != "<unknown>" } ?: "Unknown Artist"
+    val currentPath = currentAudio.path
+
+    val progress = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+
+    // Swipe to Dismiss Gesture State
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = offsetX,
+        animationSpec = tween(durationMillis = 150),
+        label = "miniplayer_swipe_offset"
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset { IntOffset(animatedOffsetX.roundToInt(), 0) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (abs(offsetX) > 220f) {
+                            // Swiped far enough - stop playback to dismiss mini player
+                            playerViewModel.stopPlayback()
+                            offsetX = 0f
+                        } else {
+                            // Snap back to center
+                            offsetX = 0f
                         }
-                    )
-                }
-                .clickable { onNavigateToPlayer(currentAudio.path) }
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF2A2A2A))
-                    ) {
-                        val albumArtUrl by playerViewModel.currentAlbumArtUrl.collectAsStateWithLifecycle()
-                        val sArtworkUri = android.net.Uri.parse("content://media/external/audio/albumart")
-                        val coverUri = currentAudio.albumId.let { android.content.ContentUris.withAppendedId(sArtworkUri, it) }
-                        SubcomposeAsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(albumArtUrl ?: coverUri ?: currentAudio.path)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Mini Player Art",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                            content = {
-                                val state = painter.state
-                                if (state is AsyncImagePainter.State.Error || state is AsyncImagePainter.State.Empty) {
-                                    com.example.ui.components.AnimatedPlaceholderAlbumArt(modifier = Modifier.fillMaxSize())
-                                } else {
-                                    SubcomposeAsyncImageContent()
-                                }
-                            }
-                        )
+                    },
+                    onDragCancel = {
+                        offsetX = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        offsetX += dragAmount
                     }
-                    
-                    Spacer(modifier = Modifier.width(12.dp))
-                    
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = currentAudio.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White,
-                            maxLines = 1,
-                            modifier = Modifier.basicMarquee()
-                        )
-                        Text(
-                            text = currentAudio.artist.takeIf { it != "<unknown>" } ?: "Unknown Artist",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            modifier = Modifier.basicMarquee()
-                        )
-                    }
-                    
-                    IconButton(onClick = { playerViewModel.skipToPrevious() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.SkipPrevious,
-                            contentDescription = "Previous",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(onClick = { playerViewModel.playPause() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { playerViewModel.skipToNext() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.SkipNext,
-                            contentDescription = "Next",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(onClick = { playerViewModel.stopPlayback() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Close",
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                
-                // Non-interactive progress line
-                val progress = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(2.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent
                 )
             }
+            .clickable {
+                if (abs(offsetX) < 20f && currentPath.isNotEmpty()) {
+                    onNavigateToPlayer(currentPath)
+                }
+            },
+        color = Color(0xFF161819)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Thin orange playback progress indicator on top
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+                color = Color(0xFFFF653F),
+                trackColor = Color.Transparent
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Vinyl / Waveform album art thumbnail
+                MiniPlayerAlbumArt()
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Title and Artist Column
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = Color(0xFFE8E8E6),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = artist,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                        color = Color(0xFF92999D),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Pause / Play button
+                IconButton(
+                    onClick = { playerViewModel.playPause() },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "Play/Pause",
+                        tint = Color(0xFFE8E8E6),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Next track button
+                IconButton(
+                    onClick = { playerViewModel.skipToNext() },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = "Next Track",
+                        tint = Color(0xFFE8E8E6),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MiniPlayerAlbumArt(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF242829)),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize(0.85f)) {
+            val c = center
+            val r = size.minDimension / 2
+
+            // Outer dark ring
+            drawCircle(
+                color = Color(0xFF33383A),
+                radius = r,
+                center = c
+            )
+            // Middle dark surface ring
+            drawCircle(
+                color = Color(0xFF161819),
+                radius = r * 0.72f,
+                center = c
+            )
+            // Accent orange ring
+            drawCircle(
+                color = Color(0xFFFF653F).copy(alpha = 0.65f),
+                radius = r * 0.45f,
+                center = c
+            )
+            // Center bright orange dot
+            drawCircle(
+                color = Color(0xFFFF653F),
+                radius = r * 0.25f,
+                center = c
+            )
         }
     }
 }
