@@ -4,56 +4,44 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.remember
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.ui.graphics.Color
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.ui.Modifier
-import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.di.appContainer
+import androidx.navigation.navArgument
+import com.example.ui.components.MiniPlayer
 import com.example.ui.navigation.Screen
-import com.example.ui.screens.PlayerScreen
-import com.example.ui.screens.VideosScreen
-import com.example.ui.screens.AudioScreen
+import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.viewmodel.AudioPlayerViewModel
 import com.example.ui.viewmodels.MediaViewModel
 import com.example.ui.viewmodels.MediaViewModelFactory
-
-import com.example.ui.screens.AudioPlayerScreen
-import com.example.ui.screens.SettingsScreen
-import com.example.ui.components.MiniPlayer
 import com.example.ui.viewmodels.ThemeManager
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -72,14 +60,14 @@ class MainActivity : ComponentActivity() {
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         insetsController.hide(WindowInsetsCompat.Type.statusBars())
+
         setContent {
             val primaryColorFlow by ThemeManager.primaryColor.collectAsStateWithLifecycle()
-            val primaryColor by androidx.compose.animation.animateColorAsState(
+            val primaryColor by animateColorAsState(
                 targetValue = primaryColorFlow,
-                animationSpec = androidx.compose.animation.core.tween(durationMillis = 700),
+                animationSpec = tween(durationMillis = 700),
                 label = "color_transition"
             )
-            var showShortcutsHelp by remember { androidx.compose.runtime.mutableStateOf(false) }
 
             MyApplicationTheme(primaryColor = primaryColor) {
                 val navController = rememberNavController()
@@ -87,7 +75,7 @@ class MainActivity : ComponentActivity() {
                 val container = (applicationContext as StreamXApplication).container
                 val factory = MediaViewModelFactory(container.mediaRepository)
                 val mediaViewModel: MediaViewModel = viewModel(factory = factory)
-                val audioPlayerViewModel: com.example.ui.viewmodel.AudioPlayerViewModel = viewModel()
+                val audioPlayerViewModel: AudioPlayerViewModel = viewModel()
 
                 val audios by mediaViewModel.audios.collectAsStateWithLifecycle()
                 LaunchedEffect(audios) {
@@ -96,7 +84,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                val context = androidx.compose.ui.platform.LocalContext.current
+                val context = LocalContext.current
                 val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                     arrayOf(
                         android.Manifest.permission.READ_MEDIA_AUDIO,
@@ -109,7 +97,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 
-                var permissionsGranted by remember { androidx.compose.runtime.mutableStateOf(false) }
+                var permissionsGranted by remember { mutableStateOf(false) }
                 val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                     androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
                 ) { result ->
@@ -134,8 +122,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (!permissionsGranted) {
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.Text("Please grant media permissions to proceed.", color = Color.White)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Please grant media permissions to proceed.", color = Color.White)
                     }
                     return@MyApplicationTheme
                 }
@@ -155,15 +143,15 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            StreamXBottomNavigation(navController = navController, primaryColor = primaryColor)
+                            StreamXBottomNavigation(navController = navController)
                         } 
                     },
-                    containerColor = Color(0xFF0F1113),
+                    containerColor = Color(0xFF0D0F10),
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Audio.route,
+                        startDestination = Screen.Videos.route,
                         modifier = Modifier.padding(innerPadding)
                     ) {
                         composable(Screen.Videos.route) {
@@ -177,16 +165,16 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable(Screen.Playlists.route) {
-                            com.example.ui.screens.PlaylistsScreen(viewModel = mediaViewModel) { playlistId ->
+                            PlaylistsScreen(viewModel = mediaViewModel) { playlistId ->
                                 navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
                             }
                         }
                         composable(
                             route = Screen.PlaylistDetail.route,
-                            arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.IntType })
+                            arguments = listOf(navArgument("id") { type = NavType.IntType })
                         ) { backStackEntry ->
                             val playlistId = backStackEntry.arguments?.getInt("id") ?: -1
-                            com.example.ui.screens.PlaylistDetailScreen(
+                            PlaylistDetailScreen(
                                 playlistId = playlistId,
                                 viewModel = mediaViewModel,
                                 onBack = { navController.popBackStack() },
@@ -194,7 +182,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(playerViewModel = audioPlayerViewModel, onClose = { navController.popBackStack() })
+                            SettingsScreen(playerViewModel = audioPlayerViewModel)
                         }
                         composable(Screen.Player.route) { backStackEntry ->
                             val path = backStackEntry.arguments?.getString("path") ?: ""
@@ -203,8 +191,8 @@ class MainActivity : ComponentActivity() {
                         composable(
                             Screen.AudioPlayer.route,
                             arguments = listOf(
-                                androidx.navigation.navArgument("path") { type = androidx.navigation.NavType.StringType },
-                                androidx.navigation.navArgument("restart") { type = androidx.navigation.NavType.BoolType; defaultValue = false }
+                                navArgument("path") { type = NavType.StringType },
+                                navArgument("restart") { type = NavType.BoolType; defaultValue = false }
                             )
                         ) { backStackEntry ->
                             val path = backStackEntry.arguments?.getString("path") ?: ""
@@ -219,32 +207,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                
-                if (showShortcutsHelp) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showShortcutsHelp = false },
-                        title = { Text("Keyboard Shortcuts") },
-                        text = {
-                            Column {
-                                Text("• Spacebar: Play / Pause")
-                                Text("• Left Arrow: Skip Previous")
-                                Text("• Right Arrow: Skip Next")
-                            }
-                        },
-                        confirmButton = {
-                            androidx.compose.material3.TextButton(onClick = { showShortcutsHelp = false }) {
-                                Text("Close")
-                            }
-                        }
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-fun StreamXBottomNavigation(navController: NavHostController, primaryColor: Color) {
+fun StreamXBottomNavigation(navController: NavHostController) {
     val items = listOf(
         Screen.Videos,
         Screen.Audio,
@@ -255,30 +224,35 @@ fun StreamXBottomNavigation(navController: NavHostController, primaryColor: Colo
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Hide bottom nav when in player
+    // Hide bottom nav when in player screens
     if (currentRoute?.startsWith("player") == true || currentRoute?.startsWith("audio_player") == true) {
         return
     }
 
-    androidx.compose.material3.Surface(
-        color = Color(0xFF0A0A0A),
-        contentColor = Color(0xFFAAAAAA),
+    Surface(
+        color = Color(0xFF0D0F10),
         modifier = Modifier.fillMaxWidth()
     ) {
-        androidx.compose.foundation.layout.Column {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(68.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEach { screen ->
                     val isSelected = currentRoute == screen.route
-                    androidx.compose.foundation.layout.Box(
+                    val activeColor = Color(0xFFE8E8E6)
+                    val inactiveColor = Color(0xFF92999D)
+
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .clickable(
-                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
                                 navController.navigate(screen.route) {
@@ -291,27 +265,34 @@ fun StreamXBottomNavigation(navController: NavHostController, primaryColor: Colo
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            androidx.compose.foundation.layout.Box(
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) primaryColor else Color.Transparent),
+                                    .width(60.dp)
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) Color(0xFF242829) else Color.Transparent),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = screen.icon,
                                     contentDescription = screen.title,
-                                    tint = if (isSelected) Color.Black else Color.White.copy(alpha = 0.5f)
+                                    tint = if (isSelected) activeColor else inactiveColor,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
-                            if (isSelected) {
-                                Text(
-                                    text = screen.title, 
-                                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = primaryColor
-                                )
-                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = screen.title, 
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (isSelected) activeColor else inactiveColor
+                            )
                         }
                     }
                 }
