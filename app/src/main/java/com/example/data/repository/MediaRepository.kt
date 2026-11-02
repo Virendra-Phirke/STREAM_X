@@ -58,9 +58,9 @@ class MediaRepository(
             }
         }
 
-        // Insert directly with REPLACE conflict strategy
-        database.videoDao.insertVideos(scannedVideos)
-        database.audioDao.insertAllAudio(audioToInsert)
+        // Atomic database sync
+        database.videoDao.syncVideos(scannedVideos)
+        database.audioDao.syncAudio(audioToInsert)
     }
 
     suspend fun toggleAudioLike(path: String, isLiked: Boolean) {

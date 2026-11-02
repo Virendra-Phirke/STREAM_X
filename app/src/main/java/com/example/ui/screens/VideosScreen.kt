@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,20 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.VideocamOff
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import kotlin.math.pow
 import com.example.data.model.VideoEntity
 import com.example.ui.viewmodels.MediaViewModel
@@ -148,6 +163,7 @@ fun VideosScreen(
     LaunchedEffect(permissionState.status) {
         if (permissionState.status.isGranted) {
             viewModel.scanMedia()
+            viewModel.observeMediaChanges(context)
         } else {
             permissionState.launchPermissionRequest()
         }
@@ -163,17 +179,12 @@ fun VideosScreen(
                 }
             }
         } else {
-            if (videos.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                    Text("No videos found")
-                }
-            } else {
-                Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                         if (inSelectionMode) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 IconButton(onClick = { 
@@ -281,74 +292,88 @@ fun VideosScreen(
                             }
                         }
                     }
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(itemsToDisplay, key = { if (it is String) it else (it as VideoEntity).path }) { item ->
-                            if (item is String) {
-                                FolderItem(
-                                    path = item, 
-                                    isSelected = selectedItems.contains(item),
-                                    inSelectionMode = inSelectionMode,
-                                    onSelect = { 
-                                        if (selectedItems.contains(item)) selectedItems.remove(item) 
-                                        else selectedItems.add(item)
-                                        if (selectedItems.isEmpty()) inSelectionMode = false 
-                                    },
-                                    onClick = { currentPath = item },
-                                    onLongClick = { 
-                                        inSelectionMode = true
-                                        selectedItems.add(item)
-                                    }
-                                )
-                            } else if (item is VideoEntity) {
-                                VideoItem(
-                                    video = item, 
-                                    isSelected = selectedItems.contains(item.path),
-                                    inSelectionMode = inSelectionMode,
-                                    onSelect = { 
-                                        if (selectedItems.contains(item.path)) selectedItems.remove(item.path) 
-                                        else selectedItems.add(item.path)
-                                        if (selectedItems.isEmpty()) inSelectionMode = false
-                                    },
-                                    onClick = { onVideoClick(item.path) }, 
-                                    onLongClick = { 
-                                        inSelectionMode = true
-                                        selectedItems.add(item.path)
-                                    },
-                                    onInfoClick = { selectedVideoForInfo = item }
-                                )
+                    if (videos.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyVideosState(
+                                onBrowseFiles = { launcher.launch(arrayOf("video/*", "audio/*")) },
+                                onRescan = { viewModel.scanMedia() }
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(itemsToDisplay, key = { if (it is String) it else (it as VideoEntity).path }) { item ->
+                                if (item is String) {
+                                    FolderItem(
+                                        path = item, 
+                                        isSelected = selectedItems.contains(item),
+                                        inSelectionMode = inSelectionMode,
+                                        onSelect = { 
+                                            if (selectedItems.contains(item)) selectedItems.remove(item) 
+                                            else selectedItems.add(item)
+                                            if (selectedItems.isEmpty()) inSelectionMode = false 
+                                        },
+                                        onClick = { currentPath = item },
+                                        onLongClick = { 
+                                            inSelectionMode = true
+                                            selectedItems.add(item)
+                                        }
+                                    )
+                                } else if (item is VideoEntity) {
+                                    VideoItem(
+                                        video = item, 
+                                        isSelected = selectedItems.contains(item.path),
+                                        inSelectionMode = inSelectionMode,
+                                        onSelect = { 
+                                            if (selectedItems.contains(item.path)) selectedItems.remove(item.path) 
+                                            else selectedItems.add(item.path)
+                                            if (selectedItems.isEmpty()) inSelectionMode = false
+                                        },
+                                        onClick = { onVideoClick(item.path) }, 
+                                        onLongClick = { 
+                                            inSelectionMode = true
+                                            selectedItems.add(item.path)
+                                        },
+                                        onInfoClick = { selectedVideoForInfo = item }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
-    
-    selectedVideoForInfo?.let { video ->
-        AlertDialog(
-            onDismissRequest = { selectedVideoForInfo = null },
-            title = { Text("Video Details", style = MaterialTheme.typography.titleLarge) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Title: ${video.title}")
-                    Text("Path: ${video.path}")
-                    Text("Duration: ${formatDuration(video.duration)}")
-                    Text("Resolution: ${video.resolution}")
-                    Text("Size: ${formatSize(video.size)}")
+
+        selectedVideoForInfo?.let { video ->
+            AlertDialog(
+                onDismissRequest = { selectedVideoForInfo = null },
+                title = { Text("Video Details", style = MaterialTheme.typography.titleLarge) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Title: ${video.title}")
+                        Text("Path: ${video.path}")
+                        Text("Duration: ${formatDuration(video.duration)}")
+                        Text("Resolution: ${video.resolution}")
+                        Text("Size: ${formatSize(video.size)}")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedVideoForInfo = null }) {
+                        Text("Close")
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedVideoForInfo = null }) {
-                    Text("Close")
-                }
-            }
-        )
+            )
+        }
     }
-}
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -503,5 +528,107 @@ fun VideoItem(video: VideoEntity, isSelected: Boolean, inSelectionMode: Boolean,
                 }
             }
         }
+    }
+}
+
+@Composable
+fun EmptyVideosState(
+    onBrowseFiles: () -> Unit,
+    onRescan: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.VideocamOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "No Videos Found",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "No video files discovered on your device storage. Open a file directly or rescan your folders.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onBrowseFiles,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.FolderOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Browse Files")
+                }
+
+                OutlinedButton(
+                    onClick = onRescan,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Rescan")
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun EmptyVideosStatePreview() {
+    MaterialTheme {
+        EmptyVideosState(
+            onBrowseFiles = {},
+            onRescan = {}
+        )
     }
 }

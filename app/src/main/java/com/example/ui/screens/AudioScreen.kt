@@ -54,6 +54,7 @@ fun AudioScreen(
     viewModel: MediaViewModel,
     onAudioClick: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             onAudioClick(it.toString())
@@ -99,6 +100,7 @@ fun AudioScreen(
     LaunchedEffect(permissionState.allPermissionsGranted) {
         if (permissionState.allPermissionsGranted) {
             viewModel.scanMedia()
+            viewModel.observeMediaChanges(context)
         } else {
             permissionState.launchMultiplePermissionRequest()
         }
