@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.data.model.AudioEntity
 import com.example.data.model.PlaybackHistoryEntity
 import com.example.data.model.PlaylistEntity
@@ -26,6 +27,12 @@ interface VideoDao {
 
     @Query("DELETE FROM videos")
     suspend fun deleteAll()
+
+    @Transaction
+    suspend fun syncVideos(videos: List<VideoEntity>) {
+        deleteAll()
+        insertVideos(videos)
+    }
 }
 
 @Dao
@@ -50,6 +57,12 @@ interface AudioDao {
 
     @Query("DELETE FROM audio")
     suspend fun deleteAll()
+
+    @Transaction
+    suspend fun syncAudio(audioList: List<AudioEntity>) {
+        deleteAll()
+        insertAllAudio(audioList)
+    }
 }
 
 @Dao

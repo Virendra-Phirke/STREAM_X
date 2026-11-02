@@ -73,6 +73,9 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     private var hasScanned = false
+    private var contentObserver: android.database.ContentObserver? = null
+    private var contentResolver: android.content.ContentResolver? = null
+    private var debouncedScanJob: kotlinx.coroutines.Job? = null
 
     fun scanMedia() {
         if (hasScanned) return
@@ -89,22 +92,59 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     fun observeMediaChanges(context: android.content.Context) {
-        val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+        if (contentObserver != null) return
+        val resolver = context.applicationContext.contentResolver
+        contentResolver = resolver
+
+        contentObserver = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
-                forceScanMedia()
+                scheduleDebouncedScan()
+            }
+
+            override fun onChange(selfChange: Boolean, uri: android.net.Uri?) {
+                super.onChange(selfChange, uri)
+                scheduleDebouncedScan()
             }
         }
-        context.contentResolver.registerContentObserver(
-            android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            true,
-            observer
-        )
-        context.contentResolver.registerContentObserver(
-            android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-            true,
-            observer
-        )
+
+        contentObserver?.let { observer ->
+            try {
+                resolver.registerContentObserver(
+                    android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    true,
+                    observer
+                )
+                resolver.registerContentObserver(
+                    android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                    true,
+                    observer
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun scheduleDebouncedScan() {
+        debouncedScanJob?.cancel()
+        debouncedScanJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
+            repository.scanAndSaveMedia()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        contentObserver?.let { observer ->
+            try {
+                contentResolver?.unregisterContentObserver(observer)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        contentObserver = null
+        contentResolver = null
     }
 }
 
