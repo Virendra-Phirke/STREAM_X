@@ -1,533 +1,579 @@
 package com.example.ui.screens
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.BackHandler
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.combinedClickable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DriveFolderUpload
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.SdStorage
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import kotlin.math.pow
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.data.model.VideoEntity
 import com.example.ui.viewmodels.MediaViewModel
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 
-import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
-import coil.ImageLoader
-import coil.decode.VideoFrameDecoder
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.clip
-
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun VideosScreen(
     viewModel: MediaViewModel,
     onVideoClick: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val videos by viewModel.videos.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+
+    var selectedVideoForInfo by remember { mutableStateOf<VideoEntity?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
+    var sortOrder by remember { mutableStateOf("Date modified") }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+    var currentFolder by remember { mutableStateOf<String?>(null) }
+
+    // System File Picker
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             onVideoClick(it.toString())
         }
     }
 
-    val permissionString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_VIDEO
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+    // Extract real folder paths from scanned video entities
+    val folderMap = remember(videos) {
+        val map = mutableMapOf<String, Int>()
+        videos.forEach { video ->
+            val parentPath = video.path.substringBeforeLast('/', "")
+            val folderName = if (parentPath.isNotEmpty()) parentPath.substringAfterLast('/') else "Storage"
+            if (folderName.isNotEmpty()) {
+                map[folderName] = (map[folderName] ?: 0) + 1
+            }
+        }
+        map
     }
-    val permissionState = rememberPermissionState(permissionString)
 
-    val videos by viewModel.videos.collectAsStateWithLifecycle()
-    
-    var sortOrder by remember { mutableStateOf("Name") }
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedVideoForInfo by remember { mutableStateOf<VideoEntity?>(null) }
-    var isSearchExpanded by remember { mutableStateOf(false) }
-    var inSelectionMode by remember { mutableStateOf(false) }
-    val selectedItems = remember { mutableStateListOf<String>() }
-    var showPlaylistDialog by remember { mutableStateOf(false) }
-    
-    val commonRoot = remember(videos) {
-        if (videos.isEmpty()) "/" else {
-            var prefix = videos.first().path.substringBeforeLast('/')
-            for (v in videos) {
-                val p = v.path.substringBeforeLast('/')
-                while (!p.startsWith(prefix) && prefix.isNotEmpty()) {
-                    val lastSlash = prefix.lastIndexOf('/')
-                    if (lastSlash == -1) {
-                        prefix = ""
-                        break
+    // Filter and Sort Real Videos
+    val filteredVideos = remember(videos, searchQuery, currentFolder, sortOrder) {
+        videos.filter { video ->
+            val parentPath = video.path.substringBeforeLast('/', "")
+            val folderName = if (parentPath.isNotEmpty()) parentPath.substringAfterLast('/') else "Storage"
+            (currentFolder == null || folderName.equals(currentFolder, ignoreCase = true)) &&
+            (searchQuery.isBlank() || video.title.contains(searchQuery, ignoreCase = true))
+        }.let { list ->
+            when (sortOrder) {
+                "Name" -> list.sortedBy { it.title.lowercase() }
+                "Size" -> list.sortedByDescending { it.size }
+                "Duration" -> list.sortedByDescending { it.duration }
+                else -> list.sortedByDescending { it.id }
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D0F10))
+    ) {
+        if (videos.isEmpty()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                MainHeader(
+                    itemCount = 0,
+                    isSearchExpanded = isSearchExpanded,
+                    searchQuery = searchQuery,
+                    sortOrder = sortOrder,
+                    sortMenuExpanded = sortMenuExpanded,
+                    onSearchToggle = { isSearchExpanded = !isSearchExpanded; if (!isSearchExpanded) searchQuery = "" },
+                    onSearchQueryChange = { searchQuery = it },
+                    onUploadClick = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
+                    onSortToggle = { sortMenuExpanded = !sortMenuExpanded },
+                    onSortOrderSelect = { selectedSort ->
+                        sortOrder = selectedSort
+                        sortMenuExpanded = false
                     }
-                    prefix = prefix.substring(0, lastSlash)
-                }
-            }
-            if (prefix.isEmpty()) "/" else prefix
-        }
-    }
-    
-    var currentPath by remember(commonRoot) { mutableStateOf<String>(commonRoot) }
-    
-    BackHandler(enabled = currentPath != commonRoot && !isSearchExpanded) {
-        val lastSlash = currentPath.lastIndexOf('/')
-        if (lastSlash != -1 && currentPath.substring(0, lastSlash).startsWith(commonRoot)) {
-            currentPath = currentPath.substring(0, lastSlash)
-        } else {
-            currentPath = commonRoot
-        }
-    }
+                )
 
-    val itemsToDisplay = remember(videos, currentPath, sortOrder, searchQuery, isSearchExpanded) {
-        val isSearching = searchQuery.isNotBlank() && isSearchExpanded
-        val filteredVideos = if (isSearching) {
-            videos.filter { it.title.contains(searchQuery, ignoreCase = true) }
-        } else videos
-        
-        val sortedVideos = when (sortOrder) {
-            "Size" -> filteredVideos.sortedByDescending { it.size }
-            "Duration" -> filteredVideos.sortedByDescending { it.duration }
-            "Date Modified" -> filteredVideos.sortedByDescending { it.lastPlayed }
-            else -> filteredVideos.sortedBy { it.title.lowercase() }
-        }
-        
-        if (isSearching) {
-            sortedVideos
-        } else {
-            val currentPrefix = if (currentPath == "/") "/" else "$currentPath/"
-            val folders = mutableSetOf<String>()
-            val vids = mutableListOf<VideoEntity>()
-            for (v in sortedVideos) {
-                if (v.path.startsWith(currentPrefix)) {
-                    val remaining = v.path.substring(currentPrefix.length)
-                    val slashIndex = remaining.indexOf('/')
-                    if (slashIndex == -1) {
-                        vids.add(v)
-                    } else {
-                        folders.add(currentPrefix + remaining.substring(0, slashIndex))
-                    }
-                }
-            }
-            
-            val sortedFolders = folders.sortedBy { it.substringAfterLast('/').lowercase() }
-            sortedFolders + vids
-        }
-    }
-
-    LaunchedEffect(permissionState.status) {
-        if (permissionState.status.isGranted) {
-            viewModel.scanMedia()
-            viewModel.observeMediaChanges(context)
-        } else {
-            permissionState.launchPermissionRequest()
-        }
-    }
-
-    Scaffold(
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        if (!permissionState.status.isGranted) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Button(onClick = { permissionState.launchPermissionRequest() }) {
-                    Text("Grant Storage Permission")
-                }
-            }
-        } else {
-            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                        if (inSelectionMode) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                IconButton(onClick = { 
-                                    inSelectionMode = false
-                                    selectedItems.clear()
-                                }) {
-                                    Icon(Icons.Filled.Clear, contentDescription = "Cancel selection", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                                Text("${selectedItems.size} selected", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                            }
-                            Row {
-                                IconButton(onClick = { showPlaylistDialog = true }) {
-                                    Icon(Icons.Filled.PlaylistAdd, contentDescription = "Add to Playlist", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                                IconButton(onClick = { 
-                                    // mock delete
-                                    inSelectionMode = false
-                                    selectedItems.clear()
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
-                        } else if (isSearchExpanded) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search folders & videos") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                leadingIcon = { 
-                                    IconButton(onClick = { 
-                                        isSearchExpanded = false
-                                        searchQuery = ""
-                                    }) {
-                                        Icon(Icons.Filled.Clear, contentDescription = "Close search")
-                                    }
-                                },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Filled.Clear, contentDescription = "Clear text")
-                                        }
-                                    }
-                                }
-                            )
-                        } else {
-                            // Breadcrumb
-                            androidx.compose.foundation.lazy.LazyRow(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val remaining = currentPath.removePrefix(commonRoot)
-                                val parts = remaining.split("/").filter { it.isNotEmpty() }
-                                
-                                item {
-                                    Text(
-                                        text = "Internal Storage",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = if (parts.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.clickable { currentPath = commonRoot }.padding(8.dp)
-                                    )
-                                }
-                                var acc = commonRoot
-                                parts.forEachIndexed { index, part ->
-                                    item {
-                                        Text("/", modifier = Modifier.padding(horizontal = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        acc += "/$part"
-                                        val pathForClick = acc // capture for lambda
-                                        Text(
-                                            text = part,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = if (index == parts.lastIndex) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.clickable { currentPath = pathForClick }.padding(8.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            IconButton(onClick = { isSearchExpanded = true }) {
-                                Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurface)
-                            }
-                            IconButton(onClick = { launcher.launch(arrayOf("video/*", "audio/*")) }) {
-                                Icon(Icons.Filled.Folder, contentDescription = "Browse Files", tint = MaterialTheme.colorScheme.onSurface)
-                            }
-                        }
-                    }
-                    if (!isSearchExpanded && !inSelectionMode) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Sort: ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                            var expanded by remember { mutableStateOf(false) }
-                            Box {
-                                TextButton(onClick = { expanded = true }) {
-                                    Text(sortOrder, color = MaterialTheme.colorScheme.primary)
-                                }
-                                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                                    DropdownMenuItem(text = { Text("Name") }, onClick = { sortOrder = "Name"; expanded = false })
-                                    DropdownMenuItem(text = { Text("Date Modified") }, onClick = { sortOrder = "Date Modified"; expanded = false })
-                                    DropdownMenuItem(text = { Text("Size") }, onClick = { sortOrder = "Size"; expanded = false })
-                                    DropdownMenuItem(text = { Text("Duration") }, onClick = { sortOrder = "Duration"; expanded = false })
-                                }
-                            }
-                        }
-                    }
-                    if (videos.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            EmptyVideosState(
-                                onBrowseFiles = { launcher.launch(arrayOf("video/*", "audio/*")) },
-                                onRescan = { viewModel.scanMedia() }
-                            )
-                        }
+                    if (isScanning) {
+                        MediaScanningLoader(
+                            title = "Checking media files...",
+                            subtitle = "Scanning device storage for video content"
+                        )
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(itemsToDisplay, key = { if (it is String) it else (it as VideoEntity).path }) { item ->
-                                if (item is String) {
-                                    FolderItem(
-                                        path = item, 
-                                        isSelected = selectedItems.contains(item),
-                                        inSelectionMode = inSelectionMode,
-                                        onSelect = { 
-                                            if (selectedItems.contains(item)) selectedItems.remove(item) 
-                                            else selectedItems.add(item)
-                                            if (selectedItems.isEmpty()) inSelectionMode = false 
-                                        },
-                                        onClick = { currentPath = item },
-                                        onLongClick = { 
-                                            inSelectionMode = true
-                                            selectedItems.add(item)
-                                        }
-                                    )
-                                } else if (item is VideoEntity) {
-                                    VideoItem(
-                                        video = item, 
-                                        isSelected = selectedItems.contains(item.path),
-                                        inSelectionMode = inSelectionMode,
-                                        onSelect = { 
-                                            if (selectedItems.contains(item.path)) selectedItems.remove(item.path) 
-                                            else selectedItems.add(item.path)
-                                            if (selectedItems.isEmpty()) inSelectionMode = false
-                                        },
-                                        onClick = { onVideoClick(item.path) }, 
-                                        onLongClick = { 
-                                            inSelectionMode = true
-                                            selectedItems.add(item.path)
-                                        },
-                                        onInfoClick = { selectedVideoForInfo = item }
-                                    )
-                                }
+                        EmptyVideosState(
+                            onBrowseFiles = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
+                            onRescan = { viewModel.forceScanMedia() }
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                // Main Header
+                item {
+                    MainHeader(
+                        itemCount = filteredVideos.size,
+                        isSearchExpanded = isSearchExpanded,
+                        searchQuery = searchQuery,
+                        sortOrder = sortOrder,
+                        sortMenuExpanded = sortMenuExpanded,
+                        onSearchToggle = { isSearchExpanded = !isSearchExpanded; if (!isSearchExpanded) searchQuery = "" },
+                        onSearchQueryChange = { searchQuery = it },
+                        onUploadClick = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
+                        onSortToggle = { sortMenuExpanded = !sortMenuExpanded },
+                        onSortOrderSelect = { selectedSort ->
+                            sortOrder = selectedSort
+                            sortMenuExpanded = false
+                        }
+                    )
+                }
+
+                // Real Folder Rows
+                if (currentFolder == null && folderMap.isNotEmpty()) {
+                    item {
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            folderMap.forEach { (folderName, count) ->
+                                FolderRow(
+                                    name = folderName,
+                                    itemCount = count.toString(),
+                                    onClick = { currentFolder = folderName }
+                                )
                             }
                         }
                     }
                 }
+
+                // Real Video Items List
+                item {
+                    VideoSectionHeader(title = if (currentFolder != null) "VIDEOS IN $currentFolder" else "ALL VIDEOS")
+                }
+
+                items(filteredVideos, key = { it.path }) { video ->
+                    RealVideoListItem(
+                        video = video,
+                        onClick = { onVideoClick(video.path) },
+                        onInfoClick = { selectedVideoForInfo = video }
+                    )
+                }
             }
         }
 
+        // Info Dialog
         selectedVideoForInfo?.let { video ->
             AlertDialog(
                 onDismissRequest = { selectedVideoForInfo = null },
+                containerColor = Color(0xFF161819),
+                titleContentColor = Color(0xFFE8E8E6),
+                textContentColor = Color(0xFF92999D),
                 title = { Text("Video Details", style = MaterialTheme.typography.titleLarge) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Title: ${video.title}")
                         Text("Path: ${video.path}")
-                        Text("Duration: ${formatDuration(video.duration)}")
-                        Text("Resolution: ${video.resolution}")
+                        Text("Resolution: ${video.resolution.ifEmpty { "1080p" }}")
                         Text("Size: ${formatSize(video.size)}")
+                        Text("Duration: ${formatDuration(video.duration)}")
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = { selectedVideoForInfo = null }) {
-                        Text("Close")
+                        Text("Close", color = Color(0xFFFF653F))
                     }
                 }
             )
         }
     }
+}
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun FolderItem(path: String, isSelected: Boolean, inSelectionMode: Boolean, onSelect: () -> Unit, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val context = LocalContext.current
-    val title = if (path.substringAfterLast('/') == "") "Internal Storage" else path.substringAfterLast('/')
-    val icon = if (path.substringAfterLast('/') == "") Icons.Filled.SdStorage else Icons.Filled.Folder
-
-    Card(
+fun MainHeader(
+    itemCount: Int,
+    isSearchExpanded: Boolean,
+    searchQuery: String,
+    sortOrder: String,
+    sortMenuExpanded: Boolean,
+    onSearchToggle: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onUploadClick: () -> Unit,
+    onSortToggle: () -> Unit,
+    onSortOrderSelect: (String) -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = {
-                    if (inSelectionMode) {
-                        onSelect()
-                    } else {
-                        onClick()
-                    }
-                },
-                onLongClick = {
-                    if (!inSelectionMode) {
-                        onLongClick()
-                    }
-                }
-            ),
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)
     ) {
+        // Title Row with Search and Import Icons
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = "Folder", tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
-            Spacer(Modifier.width(16.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (inSelectionMode) {
-                Checkbox(checked = isSelected, onCheckedChange = { onSelect() })
-            }
-        }
-    }
-}
-
-fun formatSize(size: Long): String {
-    if (size <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (kotlin.math.log10(size.toDouble()) / kotlin.math.log10(1024.0)).toInt()
-    return String.format("%.1f %s", size / 1024.0.pow(digitGroups.toDouble()), units[digitGroups])
-}
-
-fun formatDuration(duration: Long): String {
-    val totalSeconds = duration / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return String.format("%02d:%02d", minutes, seconds)
-}
-
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-fun VideoItem(video: VideoEntity, isSelected: Boolean, inSelectionMode: Boolean, onSelect: () -> Unit, onClick: () -> Unit, onLongClick: () -> Unit, onInfoClick: () -> Unit) {
-    val context = LocalContext.current
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = {
-                    if (inSelectionMode) {
-                        onSelect()
-                    } else {
-                        onClick()
+            if (isSearchExpanded) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = { Text("Search videos & folders", color = Color(0xFF92999D)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFFE8E8E6),
+                        unfocusedTextColor = Color(0xFFE8E8E6),
+                        focusedBorderColor = Color(0xFFFF653F),
+                        unfocusedBorderColor = Color(0xFF25292A)
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = onSearchToggle) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Close Search", tint = Color(0xFFE8E8E6))
+                        }
                     }
-                },
-                onLongClick = {
-                    if (!inSelectionMode) {
-                        onLongClick()
-                    }
-                }
-            )
-            .testTag("video_item_${video.id}"),
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val imageLoader = remember {
-                ImageLoader.Builder(context)
-                    .components {
-                        add(coil.decode.VideoFrameDecoder.Factory())
-                    }
-                    .build()
-            }
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .padding(end = 16.dp)
-                    .clip(RoundedCornerShape(8.dp))
-
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(video.path)
-                        .crossfade(true)
-                        .build(),
-                    imageLoader = imageLoader,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
                 )
-                // Optional overlay icon
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = Color.White.copy(alpha = 0.8f)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                val minutes = (video.duration / 1000) / 60
-                val seconds = (video.duration / 1000) % 60
-                Text(
-                    text = String.format("%02d:%02d", minutes, seconds),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (inSelectionMode) {
-                Checkbox(checked = isSelected, onCheckedChange = { onSelect() })
             } else {
-                IconButton(onClick = onInfoClick) {
-                    Icon(Icons.Filled.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "Videos",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color(0xFFE8E8E6)
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search",
+                        tint = Color(0xFFE8E8E6),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { onSearchToggle() }
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.DriveFolderUpload,
+                        contentDescription = "Upload Folder",
+                        tint = Color(0xFFE8E8E6),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { onUploadClick() }
+                    )
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Sorting Row with Dropdown Menu
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.clickable { onSortToggle() }
+                ) {
+                    Text(
+                        text = sortOrder,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        color = Color(0xFFE8E8E6),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "↓",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                        color = Color(0xFFE8E8E6)
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDropDown,
+                        contentDescription = "Sort Options",
+                        tint = Color(0xFFE8E8E6),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = sortMenuExpanded,
+                    onDismissRequest = onSortToggle,
+                    modifier = Modifier.background(Color(0xFF161819))
+                ) {
+                    listOf("Date modified", "Name", "Size", "Duration").forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option, color = Color(0xFFE8E8E6)) },
+                            onClick = { onSortOrderSelect(option) }
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "$itemCount items",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                color = Color(0xFF92999D)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Thin Divider Underneath
+        HorizontalDivider(color = Color(0xFF25292A), thickness = 1.dp)
+    }
+}
+
+@Composable
+fun FolderRow(
+    name: String,
+    itemCount: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Folder,
+            contentDescription = null,
+            tint = Color(0xFFE8E8E6),
+            modifier = Modifier.size(22.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            ),
+            color = Color(0xFFE8E8E6),
+            modifier = Modifier.weight(1f)
+        )
+
+        Text(
+            text = itemCount,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            color = Color(0xFF92999D)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Icon(
+            imageVector = Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = Color(0xFF92999D),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+fun VideoSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        ),
+        color = Color(0xFF92999D),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp)
+    )
+}
+
+@Composable
+fun RealVideoListItem(
+    video: VideoEntity,
+    onClick: () -> Unit,
+    onInfoClick: () -> Unit
+) {
+    val context = LocalContext.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Real Video Frame Thumbnail with Duration Badge
+        Box(
+            modifier = Modifier
+                .width(112.dp)
+                .height(63.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF242829))
+        ) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(video.path)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = video.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF242829)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color(0xFFFF653F),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF2D4A3E)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Folder,
+                            contentDescription = null,
+                            tint = Color(0xFFE8E8E6),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            )
+
+            // Duration Badge
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp),
+                color = Color.Black.copy(alpha = 0.82f),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = formatDuration(video.duration),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        // Metadata Column
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = video.title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = Color(0xFFE8E8E6),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "${video.resolution.ifEmpty { "1080p" }} · ${formatSize(video.size)}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                color = Color(0xFF92999D),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Circular Info Icon
+        IconButton(
+            onClick = onInfoClick,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = "Details",
+                tint = Color(0xFF92999D),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun MediaScanningLoader(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(44.dp),
+            color = Color(0xFFFF653F),
+            strokeWidth = 3.dp
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = Color(0xFFE8E8E6)
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+            color = Color(0xFF92999D),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }
 
@@ -541,8 +587,8 @@ fun EmptyVideosState(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161819)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -555,14 +601,14 @@ fun EmptyVideosState(
             Surface(
                 modifier = Modifier.size(64.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = Color(0xFF242829)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Filled.VideocamOff,
+                        imageVector = Icons.Outlined.Folder,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = Color(0xFFFF653F)
                     )
                 }
             }
@@ -573,17 +619,15 @@ fun EmptyVideosState(
                 text = "No Videos Found",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
+                color = Color(0xFFE8E8E6)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "No video files discovered on your device storage. Open a file directly or rescan your folders.",
+                text = "No video files discovered on your device storage. Pick a file directly or rescan your folders.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                color = Color(0xFF92999D)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -594,41 +638,33 @@ fun EmptyVideosState(
             ) {
                 Button(
                     onClick = onBrowseFiles,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF653F))
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.FolderOpen,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Browse Files")
+                    Text(text = "Browse Files", color = Color.White)
                 }
 
                 OutlinedButton(
                     onClick = onRescan,
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Rescan")
+                    Text(text = "Rescan", color = Color(0xFFE8E8E6))
                 }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun EmptyVideosStatePreview() {
-    MaterialTheme {
-        EmptyVideosState(
-            onBrowseFiles = {},
-            onRescan = {}
-        )
-    }
+fun formatSize(size: Long): String {
+    if (size <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (kotlin.math.log10(size.toDouble()) / kotlin.math.log10(1024.0)).toInt()
+    return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+fun formatDuration(duration: Long): String {
+    val totalSeconds = duration / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
 }
