@@ -239,7 +239,9 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showSleepTimerDialog = true },
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showSleepTimerDialog = true }
+                                .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -428,12 +430,15 @@ fun SettingsScreen(
         if (showSleepTimerDialog) {
             val options = listOf(
                 0 to "Off",
+                1 to "1 Minute",
                 5 to "5 Minutes",
                 15 to "15 Minutes",
                 30 to "30 Minutes",
                 60 to "1 Hour",
                 120 to "2 Hours"
             )
+
+            val currentMinutes = if (sleepTimerRemaining > 0) (sleepTimerRemaining / 60000).toInt().coerceAtLeast(1) else 0
 
             AlertDialog(
                 onDismissRequest = { showSleepTimerDialog = false },
@@ -444,6 +449,7 @@ fun SettingsScreen(
                 text = {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         options.forEach { (minutes, label) ->
+                            val isSelected = (minutes == 0 && currentMinutes == 0) || (minutes > 0 && currentMinutes == minutes)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -459,10 +465,19 @@ fun SettingsScreen(
                                     text = label,
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontSize = 16.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
-                                    color = Color(0xFFE8E8E6)
+                                    color = if (isSelected) Color(0xFFFF653F) else Color(0xFFE8E8E6)
                                 )
+
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color(0xFFFF653F),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
