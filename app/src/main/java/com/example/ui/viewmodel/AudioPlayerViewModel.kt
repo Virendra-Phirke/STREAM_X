@@ -314,7 +314,19 @@ class AudioPlayerViewModel(application: android.app.Application) : androidx.life
                 ms -= 1000
             }
             _sleepTimerRemaining.value = 0
-            mediaController?.pause()
+
+            try {
+                mediaController?.pause()
+                saveCurrentPosition()
+                _isPlaying.value = false
+                android.widget.Toast.makeText(
+                    getApplication(),
+                    "Sleep timer ended — Playback paused",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
