@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,12 +22,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -38,11 +36,14 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.VideoEntity
 import com.example.ui.viewmodels.MediaViewModel
+import java.util.Locale
+import kotlin.math.log10
+import kotlin.math.pow
 
 @Composable
 fun VideosScreen(
     viewModel: MediaViewModel,
-    onVideoClick: (String) -> Unit
+    onVideoClick: (String) -> Unit,
 ) {
     val videos by viewModel.videos.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
@@ -79,8 +80,9 @@ fun VideosScreen(
         videos.filter { video ->
             val parentPath = video.path.substringBeforeLast('/', "")
             val folderName = if (parentPath.isNotEmpty()) parentPath.substringAfterLast('/') else "Storage"
-            (currentFolder == null || folderName.equals(currentFolder, ignoreCase = true)) &&
-            (searchQuery.isBlank() || video.title.contains(searchQuery, ignoreCase = true))
+            val matchesFolder = (currentFolder == null || folderName.equals(currentFolder, ignoreCase = true))
+            val matchesSearch = (searchQuery.isBlank() || video.title.contains(searchQuery, ignoreCase = true))
+            matchesFolder && matchesSearch
         }.let { list ->
             when (sortOrder) {
                 "Name" -> list.sortedBy { it.title.lowercase() }
@@ -94,7 +96,7 @@ fun VideosScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D0F10))
+            .background(Color(0xFF0D0F10)),
     ) {
         if (videos.isEmpty()) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -104,14 +106,17 @@ fun VideosScreen(
                     searchQuery = searchQuery,
                     sortOrder = sortOrder,
                     sortMenuExpanded = sortMenuExpanded,
-                    onSearchToggle = { isSearchExpanded = !isSearchExpanded; if (!isSearchExpanded) searchQuery = "" },
+                    onSearchToggle = {
+                        isSearchExpanded = !isSearchExpanded
+                        if (!isSearchExpanded) searchQuery = ""
+                    },
                     onSearchQueryChange = { searchQuery = it },
                     onUploadClick = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
                     onSortToggle = { sortMenuExpanded = !sortMenuExpanded },
                     onSortOrderSelect = { selectedSort ->
                         sortOrder = selectedSort
                         sortMenuExpanded = false
-                    }
+                    },
                 )
 
                 Box(
@@ -119,17 +124,17 @@ fun VideosScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     if (isScanning) {
                         MediaScanningLoader(
                             title = "Checking media files...",
-                            subtitle = "Scanning device storage for video content"
+                            subtitle = "Scanning device storage for video content",
                         )
                     } else {
                         EmptyVideosState(
                             onBrowseFiles = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
-                            onRescan = { viewModel.forceScanMedia() }
+                            onRescan = { viewModel.forceScanMedia() },
                         )
                     }
                 }
@@ -137,7 +142,7 @@ fun VideosScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                contentPadding = PaddingValues(bottom = 16.dp),
             ) {
                 // Main Header
                 item {
@@ -147,14 +152,17 @@ fun VideosScreen(
                         searchQuery = searchQuery,
                         sortOrder = sortOrder,
                         sortMenuExpanded = sortMenuExpanded,
-                        onSearchToggle = { isSearchExpanded = !isSearchExpanded; if (!isSearchExpanded) searchQuery = "" },
+                        onSearchToggle = {
+                            isSearchExpanded = !isSearchExpanded
+                            if (!isSearchExpanded) searchQuery = ""
+                        },
                         onSearchQueryChange = { searchQuery = it },
                         onUploadClick = { fileLauncher.launch(arrayOf("video/*", "audio/*")) },
                         onSortToggle = { sortMenuExpanded = !sortMenuExpanded },
                         onSortOrderSelect = { selectedSort ->
                             sortOrder = selectedSort
                             sortMenuExpanded = false
-                        }
+                        },
                     )
                 }
 
@@ -166,7 +174,7 @@ fun VideosScreen(
                                 FolderRow(
                                     name = folderName,
                                     itemCount = count.toString(),
-                                    onClick = { currentFolder = folderName }
+                                    onClick = { currentFolder = folderName },
                                 )
                             }
                         }
@@ -182,7 +190,7 @@ fun VideosScreen(
                     RealVideoListItem(
                         video = video,
                         onClick = { onVideoClick(video.path) },
-                        onInfoClick = { selectedVideoForInfo = video }
+                        onInfoClick = { selectedVideoForInfo = video },
                     )
                 }
             }
@@ -209,7 +217,7 @@ fun VideosScreen(
                     TextButton(onClick = { selectedVideoForInfo = null }) {
                         Text("Close", color = Color(0xFFFF653F))
                     }
-                }
+                },
             )
         }
     }
@@ -226,18 +234,18 @@ fun MainHeader(
     onSearchQueryChange: (String) -> Unit,
     onUploadClick: () -> Unit,
     onSortToggle: () -> Unit,
-    onSortOrderSelect: (String) -> Unit
+    onSortOrderSelect: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
     ) {
         // Title Row with Search and Import Icons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isSearchExpanded) {
                 OutlinedTextField(
@@ -250,22 +258,22 @@ fun MainHeader(
                         focusedTextColor = Color(0xFFE8E8E6),
                         unfocusedTextColor = Color(0xFFE8E8E6),
                         focusedBorderColor = Color(0xFFFF653F),
-                        unfocusedBorderColor = Color(0xFF25292A)
+                        unfocusedBorderColor = Color(0xFF25292A),
                     ),
                     trailingIcon = {
                         IconButton(onClick = onSearchToggle) {
                             Icon(Icons.Outlined.Close, contentDescription = "Close Search", tint = Color(0xFFE8E8E6))
                         }
-                    }
+                    },
                 )
             } else {
                 Text(
                     text = "Videos",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     ),
-                    color = Color(0xFFE8E8E6)
+                    color = Color(0xFFE8E8E6),
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -275,7 +283,7 @@ fun MainHeader(
                         tint = Color(0xFFE8E8E6),
                         modifier = Modifier
                             .size(24.dp)
-                            .clickable { onSearchToggle() }
+                            .clickable { onSearchToggle() },
                     )
                     Icon(
                         imageVector = Icons.Outlined.DriveFolderUpload,
@@ -283,7 +291,7 @@ fun MainHeader(
                         tint = Color(0xFFE8E8E6),
                         modifier = Modifier
                             .size(24.dp)
-                            .clickable { onUploadClick() }
+                            .clickable { onUploadClick() },
                     )
                 }
             }
@@ -295,42 +303,42 @@ fun MainHeader(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.clickable { onSortToggle() }
+                    modifier = Modifier.clickable { onSortToggle() },
                 ) {
                     Text(
                         text = sortOrder,
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                         color = Color(0xFFE8E8E6),
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                     Text(
                         text = "↓",
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                        color = Color(0xFFE8E8E6)
+                        color = Color(0xFFE8E8E6),
                     )
                     Icon(
                         imageVector = Icons.Outlined.ArrowDropDown,
                         contentDescription = "Sort Options",
                         tint = Color(0xFFE8E8E6),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
                     )
                 }
 
                 DropdownMenu(
                     expanded = sortMenuExpanded,
                     onDismissRequest = onSortToggle,
-                    modifier = Modifier.background(Color(0xFF161819))
+                    modifier = Modifier.background(Color(0xFF161819)),
                 ) {
                     listOf("Date modified", "Name", "Size", "Duration").forEach { option ->
                         DropdownMenuItem(
                             text = { Text(option, color = Color(0xFFE8E8E6)) },
-                            onClick = { onSortOrderSelect(option) }
+                            onClick = { onSortOrderSelect(option) },
                         )
                     }
                 }
@@ -339,7 +347,7 @@ fun MainHeader(
             Text(
                 text = "$itemCount items",
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                color = Color(0xFF92999D)
+                color = Color(0xFF92999D),
             )
         }
 
@@ -354,20 +362,20 @@ fun MainHeader(
 fun FolderRow(
     name: String,
     itemCount: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Outlined.Folder,
             contentDescription = null,
             tint = Color(0xFFE8E8E6),
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(22.dp),
         )
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -376,16 +384,16 @@ fun FolderRow(
             text = name,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
             ),
             color = Color(0xFFE8E8E6),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
 
         Text(
             text = itemCount,
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-            color = Color(0xFF92999D)
+            color = Color(0xFF92999D),
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -394,7 +402,7 @@ fun FolderRow(
             imageVector = Icons.Outlined.ChevronRight,
             contentDescription = null,
             tint = Color(0xFF92999D),
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -406,10 +414,10 @@ fun VideoSectionHeader(title: String) {
         style = MaterialTheme.typography.labelSmall.copy(
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
         ),
         color = Color(0xFF92999D),
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp)
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 10.dp),
     )
 }
 
@@ -417,7 +425,7 @@ fun VideoSectionHeader(title: String) {
 fun RealVideoListItem(
     video: VideoEntity,
     onClick: () -> Unit,
-    onInfoClick: () -> Unit
+    onInfoClick: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -426,7 +434,7 @@ fun RealVideoListItem(
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Real Video Frame Thumbnail with Duration Badge
         Box(
@@ -434,7 +442,7 @@ fun RealVideoListItem(
                 .width(112.dp)
                 .height(63.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF242829))
+                .background(Color(0xFF242829)),
         ) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
@@ -449,12 +457,12 @@ fun RealVideoListItem(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color(0xFF242829)),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             color = Color(0xFFFF653F),
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                     }
                 },
@@ -463,16 +471,16 @@ fun RealVideoListItem(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color(0xFF2D4A3E)),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Folder,
                             contentDescription = null,
                             tint = Color(0xFFE8E8E6),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
-                }
+                },
             )
 
             // Duration Badge
@@ -481,16 +489,16 @@ fun RealVideoListItem(
                     .align(Alignment.BottomEnd)
                     .padding(4.dp),
                 color = Color.Black.copy(alpha = 0.82f),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp),
             ) {
                 Text(
                     text = formatDuration(video.duration),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     ),
                     color = Color.White,
-                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                 )
             }
         }
@@ -503,11 +511,11 @@ fun RealVideoListItem(
                 text = video.title,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 ),
                 color = Color(0xFFE8E8E6),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -517,20 +525,20 @@ fun RealVideoListItem(
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                 color = Color(0xFF92999D),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
         // Circular Info Icon
         IconButton(
             onClick = onInfoClick,
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(36.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = "Details",
                 tint = Color(0xFF92999D),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -540,19 +548,19 @@ fun RealVideoListItem(
 fun MediaScanningLoader(
     title: String,
     subtitle: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(44.dp),
             color = Color(0xFFFF653F),
-            strokeWidth = 3.dp
+            strokeWidth = 3.dp,
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -561,9 +569,9 @@ fun MediaScanningLoader(
             text = title,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             ),
-            color = Color(0xFFE8E8E6)
+            color = Color(0xFFE8E8E6),
         )
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -572,7 +580,7 @@ fun MediaScanningLoader(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
             color = Color(0xFF92999D),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -581,7 +589,7 @@ fun MediaScanningLoader(
 fun EmptyVideosState(
     onBrowseFiles: () -> Unit,
     onRescan: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
@@ -589,26 +597,26 @@ fun EmptyVideosState(
             .padding(horizontal = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF161819)),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Surface(
                 modifier = Modifier.size(64.dp),
                 shape = CircleShape,
-                color = Color(0xFF242829)
+                color = Color(0xFF242829),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Outlined.Folder,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
-                        tint = Color(0xFFFF653F)
+                        tint = Color(0xFFFF653F),
                     )
                 }
             }
@@ -619,7 +627,7 @@ fun EmptyVideosState(
                 text = "No Videos Found",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFE8E8E6)
+                color = Color(0xFFE8E8E6),
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -627,26 +635,26 @@ fun EmptyVideosState(
             Text(
                 text = "No video files discovered on your device storage. Pick a file directly or rescan your folders.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF92999D)
+                color = Color(0xFF92999D),
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Button(
                     onClick = onBrowseFiles,
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF653F))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF653F)),
                 ) {
                     Text(text = "Browse Files", color = Color.White)
                 }
 
                 OutlinedButton(
                     onClick = onRescan,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(text = "Rescan", color = Color(0xFFE8E8E6))
                 }
@@ -658,13 +666,40 @@ fun EmptyVideosState(
 fun formatSize(size: Long): String {
     if (size <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (kotlin.math.log10(size.toDouble()) / kotlin.math.log10(1024.0)).toInt()
-    return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    val digitGroups = (log10(size.toDouble()) / log10(1024.0)).toInt()
+    return String.format(Locale.getDefault(), "%.1f %s", size / 1024.0.pow(digitGroups.toDouble()), units[digitGroups])
 }
 
 fun formatDuration(duration: Long): String {
     val totalSeconds = duration / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return String.format("%02d:%02d", minutes, seconds)
+    return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun VideosScreenPreview() {
+    MaterialTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0D0F10)),
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                MainHeader(
+                    itemCount = 0,
+                    isSearchExpanded = false,
+                    searchQuery = "",
+                    sortOrder = "Date modified",
+                    sortMenuExpanded = false,
+                    onSearchToggle = {},
+                    onSearchQueryChange = {},
+                    onUploadClick = {},
+                    onSortToggle = {},
+                    onSortOrderSelect = {},
+                )
+            }
+        }
+    }
 }
