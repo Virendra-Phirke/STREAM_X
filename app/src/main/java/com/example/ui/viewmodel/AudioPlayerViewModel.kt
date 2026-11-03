@@ -93,9 +93,23 @@ class AudioPlayerViewModel(application: android.app.Application) : androidx.life
 
             _volume.value = controller.volume
 
+            var progressJob: kotlinx.coroutines.Job? = null
+
             controller.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlayingChange: Boolean) {
                     _isPlaying.value = isPlayingChange
+                    if (isPlayingChange) {
+                        progressJob?.cancel()
+                        progressJob = viewModelScope.launch {
+                            while (_isPlaying.value) {
+                                _currentPosition.value = controller.currentPosition
+                                _duration.value = controller.duration.coerceAtLeast(0)
+                                kotlinx.coroutines.delay(200)
+                            }
+                        }
+                    } else {
+                        progressJob?.cancel()
+                    }
                 }
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     _duration.value = controller.duration.coerceAtLeast(0)

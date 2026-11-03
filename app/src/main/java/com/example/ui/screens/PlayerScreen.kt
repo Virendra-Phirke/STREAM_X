@@ -101,12 +101,26 @@ fun PlayerScreen(
                 override fun onIsPlayingChanged(isPlayingChange: Boolean) {
                     isPlaying = isPlayingChange
                 }
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    error.printStackTrace()
+                }
             })
         }
     }
     
     LaunchedEffect(currentVideoPath) {
-        exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(currentVideoPath)))
+        val videoUri = try {
+            when {
+                currentVideoPath.startsWith("content://") ||
+                currentVideoPath.startsWith("file://") ||
+                currentVideoPath.startsWith("http://") ||
+                currentVideoPath.startsWith("https://") -> Uri.parse(currentVideoPath)
+                else -> Uri.fromFile(java.io.File(currentVideoPath))
+            }
+        } catch (e: Exception) {
+            Uri.parse(currentVideoPath)
+        }
+        exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -364,7 +378,47 @@ fun PlayerScreen(
                             IconButton(onClick = { showMoreMenu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More", tint = Color.White) }
                         }
 
-                        // Center Controls Removed
+                        // Center Playback Controls
+                        Row(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalArrangement = Arrangement.spacedBy(32.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { 
+                                if (videos.isNotEmpty()) {
+                                    val idx = videos.indexOfFirst { Uri.decode(it.path) == currentVideoPath || it.path == currentVideoPath }
+                                    if (idx > 0) currentVideoPath = videos[idx - 1].path
+                                    else exoPlayer.seekTo(0L)
+                                } else exoPlayer.seekTo(0L) 
+                            }) {
+                                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", tint = Color.White, modifier = Modifier.size(40.dp))
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.CircleShape)
+                                    .clickable { if (isPlaying) exoPlayer.pause() else exoPlayer.play() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = "Play/Pause",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(44.dp)
+                                )
+                            }
+
+                            IconButton(onClick = { 
+                                if (videos.isNotEmpty()) {
+                                    val idx = videos.indexOfFirst { Uri.decode(it.path) == currentVideoPath || it.path == currentVideoPath }
+                                    if (idx in 0 until videos.lastIndex) currentVideoPath = videos[idx + 1].path
+                                    else exoPlayer.seekTo(exoPlayer.duration)
+                                } else exoPlayer.seekTo(exoPlayer.duration) 
+                            }) {
+                                Icon(Icons.Filled.SkipNext, contentDescription = "Next", tint = Color.White, modifier = Modifier.size(40.dp))
+                            }
+                        }
 
 
                         // Bottom Controls

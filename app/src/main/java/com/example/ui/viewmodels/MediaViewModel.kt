@@ -73,6 +73,9 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     private var hasScanned = false
+    private val _isScanning = kotlinx.coroutines.flow.MutableStateFlow(true)
+    val isScanning: StateFlow<Boolean> = _isScanning
+
     private var contentObserver: android.database.ContentObserver? = null
     private var contentResolver: android.content.ContentResolver? = null
     private var debouncedScanJob: kotlinx.coroutines.Job? = null
@@ -81,13 +84,23 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         if (hasScanned) return
         viewModelScope.launch {
             hasScanned = true
-            repository.scanAndSaveMedia()
+            _isScanning.value = true
+            try {
+                repository.scanAndSaveMedia()
+            } finally {
+                _isScanning.value = false
+            }
         }
     }
     
     fun forceScanMedia() {
         viewModelScope.launch {
-            repository.scanAndSaveMedia()
+            _isScanning.value = true
+            try {
+                repository.scanAndSaveMedia()
+            } finally {
+                _isScanning.value = false
+            }
         }
     }
 
