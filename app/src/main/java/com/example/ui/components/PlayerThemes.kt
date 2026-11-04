@@ -109,27 +109,33 @@ fun DefaultPlayerTheme(
                     .background(Color(0xFFF0B849)),
                 contentAlignment = Alignment.Center
             ) {
-                SubcomposeAsyncImage(
-                    model = imageRequest,
-                    contentDescription = "Album Art",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    content = {
-                        val state = painter.state
-                        if (state is AsyncImagePainter.State.Error || state is AsyncImagePainter.State.Empty) {
-                            Text(
-                                text = initialLetter,
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontSize = 36.sp,
-                                    fontWeight = FontWeight.Black
-                                ),
-                                color = Color(0xFF161311)
-                            )
-                        } else {
-                            SubcomposeAsyncImageContent()
-                        }
+                var isImageError by remember(imageRequest) { mutableStateOf(false) }
+
+                if (!isImageError) {
+                    SubcomposeAsyncImage(
+                        model = imageRequest,
+                        contentDescription = "Album Art",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        onError = { isImageError = true }
+                    )
+                }
+
+                if (isImageError) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = initialLetter,
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Black
+                            ),
+                            color = Color(0xFF161311)
+                        )
                     }
-                )
+                }
             }
         }
 
