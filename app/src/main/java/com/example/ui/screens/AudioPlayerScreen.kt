@@ -206,10 +206,12 @@ fun AudioPlayerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     // Center Player Theme Container
                     DefaultPlayerTheme(
                         currentAudio = currentAudio,
@@ -225,11 +227,14 @@ fun AudioPlayerScreen(
                         volume = volume
                     )
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // Bottom Action Pills Row (Lyrics, Equalizer, Queue)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
+                            .navigationBarsPadding()
+                            .padding(bottom = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
