@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.viewmodel.AudioPlayerViewModel
-import com.example.ui.viewmodels.ThemeManager
+import com.example.ui.viewmodel.ThemeManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

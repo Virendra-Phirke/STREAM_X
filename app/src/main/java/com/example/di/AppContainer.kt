@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.data.db.StreamXDatabase
 import com.example.data.repository.MediaRepository
-import com.example.services.MediaScannerService
+import com.example.service.MediaScannerService
 
 /** Manages dependencies for the application manually */
 class AppContainer(private val context: Context) {
@@ -12,7 +12,7 @@ class AppContainer(private val context: Context) {
         context,
         StreamXDatabase::class.java,
         "streamx.db"
-    ).fallbackToDestructiveMigration(dropAllTables = true).build()
+    ).build()
 
     val mediaScannerService = MediaScannerService(context)
     val mediaRepository = MediaRepository(database, mediaScannerService)

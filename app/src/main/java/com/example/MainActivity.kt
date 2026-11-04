@@ -39,9 +39,9 @@ import com.example.ui.navigation.Screen
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AudioPlayerViewModel
-import com.example.ui.viewmodels.MediaViewModel
-import com.example.ui.viewmodels.MediaViewModelFactory
-import com.example.ui.viewmodels.ThemeManager
+import com.example.ui.viewmodel.MediaViewModel
+import com.example.ui.viewmodel.MediaViewModelFactory
+import com.example.ui.viewmodel.ThemeManager
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)

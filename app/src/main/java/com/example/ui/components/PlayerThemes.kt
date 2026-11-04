@@ -61,7 +61,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.AudioEntity
 import com.example.ui.viewmodel.AudioPlayerViewModel
-import com.example.ui.viewmodels.MediaViewModel
+import com.example.ui.viewmodel.MediaViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale

@@ -17,6 +17,7 @@ class PlaybackService : MediaSessionService() {
         val audioSessionId: StateFlow<Int> = _audioSessionId
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -44,9 +45,9 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player
-        player?.pause()
-        stopSelf()
-        android.os.Process.killProcess(android.os.Process.myPid())
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0 || player.playbackState == androidx.media3.common.Player.STATE_ENDED) {
+            stopSelf()
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession

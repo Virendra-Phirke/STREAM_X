@@ -42,8 +42,8 @@ import com.example.ui.components.MediaQueueSidebar
 import com.example.ui.components.PurpleGlassTheme
 import com.example.ui.components.TransparentGlassTheme
 import com.example.ui.viewmodel.AudioPlayerViewModel
-import com.example.ui.viewmodels.MediaViewModel
-import com.example.ui.viewmodels.ThemeManager
+import com.example.ui.viewmodel.MediaViewModel
+import com.example.ui.viewmodel.ThemeManager
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,13 +94,6 @@ fun AudioPlayerScreen(
     val ecoModeEnabled by ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
     val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
     val playbackSpeed by playerViewModel.playbackSpeed.collectAsStateWithLifecycle()
-
-    LaunchedEffect(isPlaying, ecoModeEnabled) {
-        while (isPlaying) {
-            playerViewModel.updateProgress()
-            delay(if (ecoModeEnabled) 5000L else 1000L)
-        }
-    }
     
     val currentAudio = if (audios.isNotEmpty() && currentMediaItemIndex in audios.indices) audios[currentMediaItemIndex] else null
     val focusRequester = remember { FocusRequester() }

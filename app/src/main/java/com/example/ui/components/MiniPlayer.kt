@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.viewmodel.AudioPlayerViewModel
-import com.example.ui.viewmodels.MediaViewModel
+import com.example.ui.viewmodel.MediaViewModel
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
