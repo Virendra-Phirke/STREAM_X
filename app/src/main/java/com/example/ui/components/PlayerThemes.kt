@@ -139,7 +139,7 @@ fun DefaultPlayerTheme(
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Track Title & Heart Row
         Row(
@@ -153,7 +153,7 @@ fun DefaultPlayerTheme(
                 Text(
                     text = trackTitle,
                     style = MaterialTheme.typography.headlineSmall.copy(
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     ),
                     color = Color(0xFFE8E8E6),
@@ -161,11 +161,11 @@ fun DefaultPlayerTheme(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
                     text = "$artistName · Sandhya",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
                     color = Color(0xFF92999D),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -189,7 +189,7 @@ fun DefaultPlayerTheme(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Seekbar Row
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -207,10 +207,10 @@ fun DefaultPlayerTheme(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(14.dp)
+                    .height(12.dp)
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -231,7 +231,7 @@ fun DefaultPlayerTheme(
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Playback Control Buttons Row
         Row(
