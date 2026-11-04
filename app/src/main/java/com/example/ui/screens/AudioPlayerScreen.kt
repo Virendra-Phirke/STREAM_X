@@ -189,7 +189,7 @@ fun AudioPlayerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .let { m ->
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            if (!ecoModeEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                                 m.blur(24.dp)
                             } else m
                         }

@@ -63,9 +63,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val primaryColorFlow by ThemeManager.primaryColor.collectAsStateWithLifecycle()
+            val ecoModeEnabled by ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
             val primaryColor by animateColorAsState(
                 targetValue = primaryColorFlow,
-                animationSpec = tween(durationMillis = 700),
+                animationSpec = tween(durationMillis = if (ecoModeEnabled) 0 else 700),
                 label = "color_transition"
             )
 

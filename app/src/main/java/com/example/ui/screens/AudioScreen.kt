@@ -255,14 +255,23 @@ fun AudioHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Audio",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-                color = Color(0xFFE8E8E6),
-            )
+            val ecoModeEnabled by com.example.ui.viewmodels.ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Audio",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = Color(0xFFE8E8E6),
+                )
+                if (ecoModeEnabled) {
+                    EcoModeBadge()
+                }
+            }
 
             Icon(
                 imageVector = Icons.Filled.MoreVert,
