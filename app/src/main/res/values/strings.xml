@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">StreamX Player</string>
+    <string name="tab_videos">Videos</string>
+    <string name="tab_audio">Audio</string>
+    <string name="tab_playlists">Playlists</string>
+    <string name="tab_settings">Settings</string>
+    <string name="no_videos_found">No Videos Found</string>
+    <string name="no_audio_found">No Audio Files Found</string>
+    <string name="browse_files">Browse Files</string>
+    <string name="rescan">Rescan</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="sleep_timer">Sleep Timer</string>
+    <string name="playlist_empty">Playlist is Empty</string>
 </resources>

@@ -3,7 +3,7 @@ package com.example.data.repository
 import com.example.data.db.StreamXDatabase
 import com.example.data.model.AudioEntity
 import com.example.data.model.VideoEntity
-import com.example.services.MediaScannerService
+import com.example.service.MediaScannerService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 

@@ -1,4 +1,4 @@
-package com.example.ui.viewmodels
+package com.example.ui.viewmodel
 
 import android.content.Context
 import android.content.SharedPreferences

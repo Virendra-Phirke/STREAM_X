@@ -9,7 +9,7 @@ class StreamXApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        com.example.ui.viewmodels.ThemeManager.initialize(this)
+        com.example.ui.viewmodel.ThemeManager.initialize(this)
         container = AppContainer(this)
     }
 }
