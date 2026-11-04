@@ -36,7 +36,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.AudioEntity
-import com.example.ui.viewmodels.MediaViewModel
+import com.example.ui.viewmodel.MediaViewModel
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.ui.text.style.TextAlign
 
 data class AudioSampleItem(
     val title: String,
@@ -68,52 +71,47 @@ fun AudioScreen(
         }
     }
 
-    val sampleAudioList = remember {
-        listOf(
-            AudioSampleItem("Aaj Jaane Ki Zid Na Karo", "Farida Khanum", "5:41", true, "CIRCLE_DOT", "A"),
-            AudioSampleItem("Evening raga, Bhimpalasi", "Pandit Hari Sen", "18:22", false, "EQUALIZER_BARS", "D"),
-            AudioSampleItem("Midnight Drive", "Kavi Ray", "3:47", true, "DIAGONAL_STRIPES", "G"),
-            AudioSampleItem("Monsoon Letters", "The Tapri Collective", "4:15", false, "GRID_DOTS", "J"),
-            AudioSampleItem("Neon Bazaar", "Kavi Ray", "3:12", false, "SPLIT_ORANGE", "M"),
-            AudioSampleItem("Paper Boats", "Ishaan Verma", "2:58", true, "SPLIT_CREAM", "P"),
-            AudioSampleItem("Rooftop Static", "The Tapri Collective", "4:36", false, "RADIO_WAVES", "S"),
-            AudioSampleItem("Slow Tide", "Ishaan Verma", "6:04", false, "DIAGONAL_STRIPES", "V"),
-            AudioSampleItem("Tin Roof", "Meera Joshi", "3:29", false, "CIRCLE_DOT", "Y"),
-        )
-    }
-
-    val displayList = remember(audios, searchQuery, sortOrder, sampleAudioList) {
-        if (audios.isEmpty()) {
-            sampleAudioList.filter {
-                searchQuery.isBlank() || it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
+    val displayList = remember(audios, searchQuery, sortOrder) {
+        audios.filter {
+            searchQuery.isBlank() || it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
+        }.let { list ->
+            when (sortOrder) {
+                "Artist" -> list.sortedBy { it.artist.lowercase() }
+                "Album" -> list.sortedBy { it.album.lowercase() }
+                "Duration" -> list.sortedByDescending { it.duration }
+                else -> list.sortedBy { it.title.lowercase() }
             }
-        } else {
-            audios.filter {
-                searchQuery.isBlank() || it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true)
-            }.mapIndexed { idx, entity ->
-                val sample = sampleAudioList.getOrElse(idx % sampleAudioList.size) { sampleAudioList[0] }
-                val showIndexLetter = idx == 0 || entity.title.firstOrNull()?.uppercaseChar() != audios.getOrNull(idx - 1)?.title?.firstOrNull()?.uppercaseChar()
-                AudioSampleItem(
-                    title = entity.title,
-                    artist = entity.artist.takeIf { it != "<unknown>" } ?: "Unknown Artist",
-                    duration = formatDuration(entity.duration),
-                    isLiked = entity.isLiked,
-                    coverType = sample.coverType,
-                    indexLetter = if (showIndexLetter) entity.title.firstOrNull()?.uppercase() else null,
-                    path = entity.path,
-                )
+        }.mapIndexed { idx, entity ->
+            val coverType = when (idx % 7) {
+                0 -> "CIRCLE_DOT"
+                1 -> "EQUALIZER_BARS"
+                2 -> "DIAGONAL_STRIPES"
+                3 -> "GRID_DOTS"
+                4 -> "SPLIT_ORANGE"
+                5 -> "SPLIT_CREAM"
+                else -> "RADIO_WAVES"
             }
+            val showIndexLetter = idx == 0 || entity.title.firstOrNull()?.uppercaseChar() != audios.getOrNull(idx - 1)?.title?.firstOrNull()?.uppercaseChar()
+            AudioSampleItem(
+                title = entity.title,
+                artist = entity.artist.takeIf { it != "<unknown>" } ?: "Unknown Artist",
+                duration = formatDuration(entity.duration),
+                isLiked = entity.isLiked,
+                coverType = coverType,
+                indexLetter = if (showIndexLetter) entity.title.firstOrNull()?.uppercase() else null,
+                path = entity.path,
+            )
         }
     }
 
-    val totalSongsCount = if (audios.isNotEmpty()) audios.size else 214
+    val totalSongsCount = audios.size
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0D0F10)),
     ) {
-        if (audios.isEmpty() && isScanning) {
+        if (audios.isEmpty()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 AudioHeader(
                     totalSongs = 0,
@@ -135,10 +133,17 @@ fun AudioScreen(
                         .padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MediaScanningLoader(
-                        title = "Checking audio files...",
-                        subtitle = "Scanning device storage for music content",
-                    )
+                    if (isScanning) {
+                        MediaScanningLoader(
+                            title = "Checking audio files...",
+                            subtitle = "Scanning device storage for music content",
+                        )
+                    } else {
+                        EmptyAudioState(
+                            onBrowseFiles = { fileLauncher.launch(arrayOf("audio/*", "video/*")) },
+                            onRescan = { viewModel.forceScanMedia() },
+                        )
+                    }
                 }
             }
         } else {
@@ -255,7 +260,7 @@ fun AudioHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val ecoModeEnabled by com.example.ui.viewmodels.ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
+            val ecoModeEnabled by com.example.ui.viewmodel.ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -559,6 +564,85 @@ fun AudioCoverIllustration(type: String) {
                 }
                 else -> {
                     drawRect(color = Color(0xFF242829), size = Size(w, h))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyAudioState(
+    onBrowseFiles: () -> Unit,
+    onRescan: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161819)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = CircleShape,
+                color = Color(0xFF242829),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = Color(0xFFFF653F),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "No Audio Files Found",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE8E8E6),
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "No music or audio tracks discovered on your device storage. Pick a file directly or rescan your folders.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF92999D),
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = onBrowseFiles,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF653F)),
+                ) {
+                    Text(text = "Browse Files", color = Color.White)
+                }
+
+                OutlinedButton(
+                    onClick = onRescan,
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(text = "Rescan", color = Color(0xFFE8E8E6))
                 }
             }
         }

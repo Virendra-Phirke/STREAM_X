@@ -104,7 +104,7 @@ class AudioPlayerViewModel(application: android.app.Application) : androidx.life
                             while (_isPlaying.value) {
                                 _currentPosition.value = controller.currentPosition
                                 _duration.value = controller.duration.coerceAtLeast(0)
-                                val isEco = com.example.ui.viewmodels.ThemeManager.ecoModeEnabled.value
+                                val isEco = com.example.ui.viewmodel.ThemeManager.ecoModeEnabled.value
                                 kotlinx.coroutines.delay(if (isEco) 1000L else 200L)
                             }
                         }
@@ -245,6 +245,7 @@ class AudioPlayerViewModel(application: android.app.Application) : androidx.life
 
     fun seekTo(position: Long) {
         mediaController?.seekTo(position)
+        _currentPosition.value = position
         saveCurrentPosition()
     }
     

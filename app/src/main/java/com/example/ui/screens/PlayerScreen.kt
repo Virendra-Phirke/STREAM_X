@@ -46,7 +46,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.example.ui.viewmodels.MediaViewModel
+import com.example.ui.viewmodel.MediaViewModel
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -229,7 +229,7 @@ fun PlayerScreen(
         }
     }
 
-    val ecoModeEnabled by com.example.ui.viewmodels.ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
+    val ecoModeEnabled by com.example.ui.viewmodel.ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
     
     LaunchedEffect(isPlaying, ecoModeEnabled) {
         while (isPlaying) {

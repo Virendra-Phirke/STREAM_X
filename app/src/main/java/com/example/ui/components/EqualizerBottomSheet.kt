@@ -40,6 +40,7 @@ fun EqualizerBottomSheet(
     var band14kHz by remember { mutableFloatStateOf(5f) }
 
     var equalizer by remember { mutableStateOf<Equalizer?>(null) }
+    var eqErrorMessage by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(audioSessionId) {
         if (audioSessionId != 0) {
@@ -47,14 +48,18 @@ fun EqualizerBottomSheet(
                 val eq = Equalizer(0, audioSessionId)
                 eq.enabled = true
                 equalizer = eq
-            } catch (e: Exception) {
+                eqErrorMessage = null
+            } catch (e: Throwable) {
+                eqErrorMessage = "Equalizer hardware effect unavailable on this audio session."
                 e.printStackTrace()
             }
+        } else {
+            eqErrorMessage = "Audio session uninitialized. Start playback to enable equalizer."
         }
         onDispose {
             try {
                 equalizer?.release()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -114,6 +119,22 @@ fun EqualizerBottomSheet(
                         uncheckedTrackColor = Color(0xFF242829)
                     )
                 )
+            }
+
+            eqErrorMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = Color(0xFF242829),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = msg,
+                        color = Color(0xFFF0B849),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
