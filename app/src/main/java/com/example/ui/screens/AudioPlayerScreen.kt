@@ -1,18 +1,22 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Equalizer
+import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.QueueMusic
-import androidx.compose.material.icons.outlined.Subject
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,15 +30,17 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.ui.components.CircularPlayerTheme
 import com.example.ui.components.DefaultPlayerTheme
 import com.example.ui.components.EqualizerBottomSheet
 import com.example.ui.components.MediaQueueSidebar
+import com.example.ui.components.PurpleGlassTheme
+import com.example.ui.components.TransparentGlassTheme
 import com.example.ui.viewmodel.AudioPlayerViewModel
 import com.example.ui.viewmodels.MediaViewModel
 import com.example.ui.viewmodels.ThemeManager
@@ -62,9 +68,12 @@ fun AudioPlayerScreen(
     val volume by playerViewModel.volume.collectAsStateWithLifecycle()
     
     val enableDynamicBackground by ThemeManager.enableDynamicBackground.collectAsStateWithLifecycle()
+    val playerUiTheme by ThemeManager.playerUiTheme.collectAsStateWithLifecycle()
 
     var showEqualizer by remember { mutableStateOf(false) }
     var showLyricsDialog by remember { mutableStateOf(false) }
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
     
     val repeatMode = playerViewModel.repeatMode.collectAsStateWithLifecycle().value
     val isShuffle = playerViewModel.shuffleModeEnabled.collectAsStateWithLifecycle().value
@@ -83,7 +92,9 @@ fun AudioPlayerScreen(
     }
 
     val ecoModeEnabled by ThemeManager.ecoModeEnabled.collectAsStateWithLifecycle()
-    
+    val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsStateWithLifecycle()
+    val playbackSpeed by playerViewModel.playbackSpeed.collectAsStateWithLifecycle()
+
     LaunchedEffect(isPlaying, ecoModeEnabled) {
         while (isPlaying) {
             playerViewModel.updateProgress()
@@ -117,22 +128,52 @@ fun AudioPlayerScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             Text(
-                                text = "Playing from Classical evenings",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                text = "PLAYING FROM",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
                                 ),
-                                color = Color(0xFFE8E8E6),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = Color(0xFF92999D)
                             )
+
+                            Spacer(modifier = Modifier.height(3.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color(0xFF1C1E20),
+                                border = BorderStroke(1.dp, Color(0xFF33383A)),
+                                onClick = { showQueueSidebar = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.PlaylistPlay,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF0B849),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = currentAudio?.album?.takeIf { it.isNotBlank() && it != "<unknown>" } ?: "Now Playing Queue",
+                                        color = Color(0xFFE8E8E6),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Back", tint = Color(0xFFE8E8E6))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFE8E8E6))
                         }
                     },
                     actions = {
@@ -185,7 +226,7 @@ fun AudioPlayerScreen(
                         .fillMaxSize()
                         .let { m ->
                             if (!ecoModeEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                m.blur(24.dp)
+                                m.blur(28.dp)
                             } else m
                         }
                         .background(Color.Black.copy(alpha = 0.5f))
@@ -195,8 +236,8 @@ fun AudioPlayerScreen(
                     modifier = Modifier.fillMaxSize().background(
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                             colors = listOf(
-                                animatedColor.copy(alpha = 0.35f),
-                                Color(0xFF0D0F10).copy(alpha = 0.95f)
+                                animatedColor.copy(alpha = 0.45f),
+                                Color(0xFF0D0F10).copy(alpha = 0.96f)
                             )
                         )
                     )
@@ -206,97 +247,85 @@ fun AudioPlayerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .padding(horizontal = 16.dp),
+                        .navigationBarsPadding()
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Center Player Theme Container
-                    DefaultPlayerTheme(
-                        currentAudio = currentAudio,
-                        decodedPath = decodedPath,
-                        imageRequest = imageRequest,
-                        playerViewModel = playerViewModel,
-                        mediaViewModel = mediaViewModel,
-                        isPlaying = isPlaying,
-                        isShuffle = isShuffle,
-                        repeatMode = repeatMode,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        volume = volume
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Bottom Action Pills Row (Lyrics, Equalizer, Queue)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            onClick = { showLyricsDialog = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF161819),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.Subject, contentDescription = null, tint = Color(0xFFE8E8E6), modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Lyrics", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE8E8E6))
-                            }
-                        }
-
-                        Surface(
-                            onClick = { showEqualizer = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF161819),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 3.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.Equalizer, contentDescription = null, tint = Color(0xFFE8E8E6), modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Equalizer", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE8E8E6))
-                            }
-                        }
-
-                        Surface(
-                            onClick = { showQueueSidebar = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFF161819),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF25292A)),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Outlined.QueueMusic, contentDescription = null, tint = Color(0xFFE8E8E6), modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Queue", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE8E8E6))
-                            }
-                        }
+                    // Center Player Theme Container based on User Theme Preference
+                    when (playerUiTheme) {
+                        "Circular Retrograde" -> CircularPlayerTheme(
+                            currentAudio = currentAudio,
+                            decodedPath = decodedPath,
+                            imageRequest = imageRequest,
+                            playerViewModel = playerViewModel,
+                            mediaViewModel = mediaViewModel,
+                            isPlaying = isPlaying,
+                            isShuffle = isShuffle,
+                            repeatMode = repeatMode,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            volume = volume,
+                            onLyricsClick = { showLyricsDialog = true },
+                            onEqualizerClick = { showEqualizer = true },
+                            onQueueClick = { showQueueSidebar = true },
+                            onSleepTimerClick = { showSleepTimerDialog = true },
+                            onSpeedClick = { showSpeedDialog = true }
+                        )
+                        "Purple Glass" -> PurpleGlassTheme(
+                            currentAudio = currentAudio,
+                            decodedPath = decodedPath,
+                            imageRequest = imageRequest,
+                            playerViewModel = playerViewModel,
+                            mediaViewModel = mediaViewModel,
+                            isPlaying = isPlaying,
+                            isShuffle = isShuffle,
+                            repeatMode = repeatMode,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            volume = volume,
+                            onLyricsClick = { showLyricsDialog = true },
+                            onEqualizerClick = { showEqualizer = true },
+                            onQueueClick = { showQueueSidebar = true },
+                            onSleepTimerClick = { showSleepTimerDialog = true },
+                            onSpeedClick = { showSpeedDialog = true }
+                        )
+                        "Transparent Glass" -> TransparentGlassTheme(
+                            currentAudio = currentAudio,
+                            decodedPath = decodedPath,
+                            imageRequest = imageRequest,
+                            playerViewModel = playerViewModel,
+                            mediaViewModel = mediaViewModel,
+                            isPlaying = isPlaying,
+                            isShuffle = isShuffle,
+                            repeatMode = repeatMode,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            volume = volume,
+                            onLyricsClick = { showLyricsDialog = true },
+                            onEqualizerClick = { showEqualizer = true },
+                            onQueueClick = { showQueueSidebar = true },
+                            onSleepTimerClick = { showSleepTimerDialog = true },
+                            onSpeedClick = { showSpeedDialog = true }
+                        )
+                        else -> DefaultPlayerTheme(
+                            currentAudio = currentAudio,
+                            decodedPath = decodedPath,
+                            imageRequest = imageRequest,
+                            playerViewModel = playerViewModel,
+                            mediaViewModel = mediaViewModel,
+                            isPlaying = isPlaying,
+                            isShuffle = isShuffle,
+                            repeatMode = repeatMode,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            volume = volume,
+                            onLyricsClick = { showLyricsDialog = true },
+                            onEqualizerClick = { showEqualizer = true },
+                            onQueueClick = { showQueueSidebar = true },
+                            onSleepTimerClick = { showSleepTimerDialog = true },
+                            onSpeedClick = { showSpeedDialog = true }
+                        )
                     }
                 }
             }
@@ -317,7 +346,7 @@ fun AudioPlayerScreen(
                     containerColor = Color(0xFF161819),
                     titleContentColor = Color(0xFFE8E8E6),
                     textContentColor = Color(0xFF92999D),
-                    title = { Text("Track Lyrics", style = MaterialTheme.typography.titleLarge) },
+                    title = { Text("Track Lyrics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                     text = {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -333,7 +362,82 @@ fun AudioPlayerScreen(
                     },
                     confirmButton = {
                         TextButton(onClick = { showLyricsDialog = false }) {
-                            Text("Close", color = Color(0xFFFF653F))
+                            Text("Close", color = Color(0xFFF0B849))
+                        }
+                    }
+                )
+            }
+
+            // Sleep Timer Picker Modal
+            if (showSleepTimerDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSleepTimerDialog = false },
+                    containerColor = Color(0xFF161819),
+                    titleContentColor = Color(0xFFE8E8E6),
+                    title = { Text("Sleep Timer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            val options = listOf(0 to "Turn Off", 15 to "15 minutes", 30 to "30 minutes", 45 to "45 minutes", 60 to "60 minutes", 90 to "90 minutes")
+                            options.forEach { (mins, label) ->
+                                TextButton(
+                                    onClick = {
+                                        playerViewModel.setSleepTimer(mins)
+                                        showSleepTimerDialog = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (mins == 0 && sleepTimerRemaining <= 0) Color(0xFF92999D) else Color(0xFFE8E8E6),
+                                        fontSize = 16.sp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Start
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSleepTimerDialog = false }) {
+                            Text("Cancel", color = Color(0xFF92999D))
+                        }
+                    }
+                )
+            }
+
+            // Playback Speed Selector Modal
+            if (showSpeedDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSpeedDialog = false },
+                    containerColor = Color(0xFF161819),
+                    titleContentColor = Color(0xFFE8E8E6),
+                    title = { Text("Playback Speed", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                            speeds.forEach { speed ->
+                                TextButton(
+                                    onClick = {
+                                        playerViewModel.setPlaybackSpeed(speed)
+                                        showSpeedDialog = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "${speed}x ${if (speed == 1.0f) "(Normal)" else ""}",
+                                        color = if (playbackSpeed == speed) Color(0xFFF0B849) else Color(0xFFE8E8E6),
+                                        fontSize = 16.sp,
+                                        fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Start
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSpeedDialog = false }) {
+                            Text("Cancel", color = Color(0xFF92999D))
                         }
                     }
                 )
@@ -357,9 +461,37 @@ fun AudioPlayerScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Add, contentDescription = null, tint = Color(0xFFFF653F))
+                                Icon(Icons.Filled.Add, contentDescription = null, tint = Color(0xFFF0B849))
                                 Spacer(Modifier.width(12.dp))
                                 Text("Add to Playlist", color = Color(0xFFE8E8E6), fontSize = 16.sp)
+                            }
+                        }
+
+                        TextButton(
+                            onClick = {
+                                showMoreMenu = false
+                                showSleepTimerDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = Color(0xFFF0B849))
+                                Spacer(Modifier.width(12.dp))
+                                Text("Sleep Timer", color = Color(0xFFE8E8E6), fontSize = 16.sp)
+                            }
+                        }
+
+                        TextButton(
+                            onClick = {
+                                showMoreMenu = false
+                                showSpeedDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Speed, contentDescription = null, tint = Color(0xFFF0B849))
+                                Spacer(Modifier.width(12.dp))
+                                Text("Playback Speed", color = Color(0xFFE8E8E6), fontSize = 16.sp)
                             }
                         }
                     }
@@ -381,13 +513,13 @@ fun AudioPlayerScreen(
                                 showPlaylistOptions = false
                                 showCreatePlaylist = true
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF653F)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0B849)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+                            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.Black)
                             Spacer(Modifier.width(8.dp))
-                            Text("Create New Playlist", color = Color.White)
+                            Text("Create New Playlist", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(16.dp))
                         androidx.compose.foundation.lazy.LazyColumn {
@@ -427,7 +559,7 @@ fun AudioPlayerScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color(0xFFE8E8E6),
                                 unfocusedTextColor = Color(0xFFE8E8E6),
-                                focusedBorderColor = Color(0xFFFF653F),
+                                focusedBorderColor = Color(0xFFF0B849),
                                 unfocusedBorderColor = Color(0xFF25292A)
                             ),
                             singleLine = true
@@ -442,7 +574,7 @@ fun AudioPlayerScreen(
                                 showCreatePlaylist = false
                             }
                         }) {
-                            Text("Create", color = Color(0xFFFF653F))
+                            Text("Create", color = Color(0xFFF0B849))
                         }
                     },
                     dismissButton = {

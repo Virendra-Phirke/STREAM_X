@@ -53,7 +53,7 @@ fun MiniPlayer(
         return
     }
 
-    val title = currentAudio.title
+    val title = cleanAudioTitle(currentAudio.title, currentAudio.path)
     val artist = currentAudio.artist.takeIf { it != "<unknown>" } ?: "Unknown Artist"
     val currentPath = currentAudio.path
 
